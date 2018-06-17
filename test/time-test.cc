@@ -1,11 +1,10 @@
-/*
- Time formatting tests
+// Formatting library for C++ - time formatting tests
+//
+// Copyright (c) 2012 - present, Victor Zverovich
+// All rights reserved.
+//
+// For the license information refer to format.h.
 
- Copyright (c) 2012 - 2016, Victor Zverovich
- All rights reserved.
-
- For the license information refer to format.h.
- */
 #ifdef WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #endif

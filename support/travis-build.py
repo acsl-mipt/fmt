@@ -2,7 +2,7 @@
 # Build the project on Travis CI.
 
 from __future__ import print_function
-import errno, os, re, shutil, sys, tempfile, urllib
+import errno, os, re, shutil, subprocess, sys, tempfile, urllib
 from subprocess import call, check_call, check_output, Popen, PIPE, STDOUT
 
 def rmtree_if_exists(dir):
@@ -75,7 +75,7 @@ if build == 'Doc':
         # Print the output without the key.
         print(p.communicate()[0].replace(os.environ['KEY'], '$KEY'))
         if p.returncode != 0:
-            raise CalledProcessError(p.returncode, cmd)
+            raise subprocess.CalledProcessError(p.returncode, cmd)
     exit(0)
 
 standard = os.environ['STANDARD']
@@ -89,10 +89,8 @@ common_cmake_flags = [
     '-DCMAKE_INSTALL_PREFIX=' + install_dir, '-DCMAKE_BUILD_TYPE=' + build
 ]
 extra_cmake_flags = []
-if standard != '0x':
-    extra_cmake_flags = [
-        '-DCMAKE_CXX_FLAGS=-std=c++' + standard, '-DFMT_USE_CPP11=OFF'
-    ]
+if standard != '14':
+    extra_cmake_flags = ['-DCMAKE_CXX_FLAGS=-std=c++' + standard]
 check_call(['cmake', '-DFMT_DOC=OFF', '-DFMT_PEDANTIC=ON', fmt_dir] +
            common_cmake_flags + extra_cmake_flags, cwd=build_dir)
 
