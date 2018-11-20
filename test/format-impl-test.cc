@@ -11,17 +11,90 @@
 
 // Include format.cc instead of format.h to test implementation.
 #include "../src/format.cc"
+#include "fmt/color.h"
 #include "fmt/printf.h"
 
 #include <algorithm>
 #include <cstring>
 
-#include "gmock/gmock.h"
+#include "gmock.h"
 #include "gtest-extra.h"
 #include "util.h"
 
 #undef min
 #undef max
+
+using fmt::internal::fp;
+
+template <bool is_iec559>
+void test_construct_from_double() {
+  fmt::print("warning: double is not IEC559, skipping FP tests\n");
+}
+
+template <>
+void test_construct_from_double<true>() {
+  auto v = fp(1.23);
+  EXPECT_EQ(v.f, 0x13ae147ae147aeu);
+  EXPECT_EQ(v.e, -52);
+}
+
+TEST(FPTest, ConstructFromDouble) {
+  test_construct_from_double<std::numeric_limits<double>::is_iec559>();
+}
+
+TEST(FPTest, Normalize) {
+  auto v = fp(0xbeef, 42);
+  v.normalize();
+  EXPECT_EQ(0xbeef000000000000, v.f);
+  EXPECT_EQ(-6, v.e);
+}
+
+TEST(FPTest, ComputeBoundariesSubnormal) {
+  auto v = fp(0xbeef, 42);
+  fp lower, upper;
+  v.compute_boundaries(lower, upper);
+  EXPECT_EQ(0xbeee800000000000, lower.f);
+  EXPECT_EQ(-6, lower.e);
+  EXPECT_EQ(0xbeef800000000000, upper.f);
+  EXPECT_EQ(-6, upper.e);
+}
+
+TEST(FPTest, ComputeBoundaries) {
+  auto v = fp(0x10000000000000, 42);
+  fp lower, upper;
+  v.compute_boundaries(lower, upper);
+  EXPECT_EQ(0x7ffffffffffffe00, lower.f);
+  EXPECT_EQ(31, lower.e);
+  EXPECT_EQ(0x8000000000000400, upper.f);
+  EXPECT_EQ(31, upper.e);
+}
+
+TEST(FPTest, Subtract) {
+  auto v = fp(123, 1) - fp(102, 1);
+  EXPECT_EQ(v.f, 21u);
+  EXPECT_EQ(v.e, 1);
+}
+
+TEST(FPTest, Multiply) {
+  auto v = fp(123ULL << 32, 4) * fp(56ULL << 32, 7);
+  EXPECT_EQ(v.f, 123u * 56u);
+  EXPECT_EQ(v.e, 4 + 7 + 64);
+  v = fp(123ULL << 32, 4) * fp(567ULL << 31, 8);
+  EXPECT_EQ(v.f, (123 * 567 + 1u) / 2);
+  EXPECT_EQ(v.e, 4 + 8 + 64);
+}
+
+TEST(FPTest, GetCachedPower) {
+  typedef std::numeric_limits<double> limits;
+  for (auto exp = limits::min_exponent; exp <= limits::max_exponent; ++exp) {
+    int dec_exp = 0;
+    auto fp = fmt::internal::get_cached_power(exp, dec_exp);
+    EXPECT_LE(exp, fp.e);
+    int dec_exp_step = 8;
+    EXPECT_LE(fp.e, exp + dec_exp_step * log2(10));
+    EXPECT_DOUBLE_EQ(pow(10, dec_exp), ldexp(fp.f, fp.e));
+  }
+}
 
 template <typename T>
 struct ValueExtractor: fmt::internal::function<T> {
@@ -30,9 +103,8 @@ struct ValueExtractor: fmt::internal::function<T> {
   }
 
   template <typename U>
-  T operator()(U) {
+  FMT_NORETURN T operator()(U) {
     throw std::runtime_error(fmt::format("invalid type {}", typeid(U).name()));
-    return T();
   }
 };
 
@@ -53,9 +125,9 @@ TEST(FormatTest, FormatNegativeNaN) {
 }
 
 TEST(FormatTest, StrError) {
-  char *message = 0;
+  char *message = nullptr;
   char buffer[BUFFER_SIZE];
-  EXPECT_ASSERT(fmt::safe_strerror(EDOM, message = 0, 0), "invalid buffer");
+  EXPECT_ASSERT(fmt::safe_strerror(EDOM, message = nullptr, 0), "invalid buffer");
   EXPECT_ASSERT(fmt::safe_strerror(EDOM, message = buffer, 0),
                 "invalid buffer");
   buffer[0] = 'x';
@@ -116,4 +188,15 @@ TEST(FormatTest, FormatErrorCode) {
     fmt::format_error_code(buffer, codes[i], prefix);
     EXPECT_EQ(msg, to_string(buffer));
   }
+}
+
+TEST(FormatTest, CountCodePoints) {
+  EXPECT_EQ(4, fmt::internal::count_code_points(fmt::u8string_view("ёжик")));
+}
+
+TEST(ColorsTest, Colors) {
+  EXPECT_WRITE(stdout, fmt::print(fmt::rgb(255,20,30), "rgb(255,20,30)"),
+               "\x1b[38;2;255;020;030mrgb(255,20,30)\x1b[0m");
+  EXPECT_WRITE(stdout, fmt::print(fmt::color::blue, "blue"),
+               "\x1b[38;2;000;000;255mblue\x1b[0m");
 }

@@ -38,8 +38,8 @@ arguments in the resulting string.
 
 .. _format:
 
-.. doxygenfunction:: format(string_view, const Args&...)
-.. doxygenfunction:: vformat(string_view, format_args)
+.. doxygenfunction:: format(const String&, const Args&...)
+.. doxygenfunction:: vformat(const String&, basic_format_args<typename buffer_context<Char>::type>)
 
 .. _print:
 
@@ -48,6 +48,9 @@ arguments in the resulting string.
 
 .. doxygenfunction:: print(std::FILE *, string_view, const Args&...)
 .. doxygenfunction:: vprint(std::FILE *, string_view, format_args)
+
+.. doxygenfunction:: print(std::FILE *, wstring_view, const Args&...)
+.. doxygenfunction:: vprint(std::FILE *, wstring_view, wformat_args)
 
 Named arguments
 ---------------
@@ -127,6 +130,25 @@ always be formatted in the same way. See ``formatter<tm>::parse`` in
 :file:`fmt/time.h` for an advanced example of how to parse the format string and
 customize the formatted output.
 
+You can also reuse existing formatters, for example::
+
+  enum class color {red, green, blue};
+
+  template <>
+  struct fmt::formatter<color>: formatter<string_view> {
+    // parse is inherited from formatter<string_view>.
+    template <typename FormatContext>
+    auto format(color c, FormatContext &ctx) {
+      string_view name = "unknown";
+      switch (c) {
+      case color::red:   name = "red"; break;
+      case color::green: name = "green"; break;
+      case color::blue:  name = "blue"; break;
+      }
+      return formatter<string_view>::format(name, ctx);
+    }
+  };
+
 This section shows how to define a custom format function for a user-defined
 type. The next section describes how to get ``fmt`` to use a conventional stream
 output ``operator<<`` when one is defined for a user-defined type.
@@ -135,7 +157,7 @@ Output iterator support
 -----------------------
 
 .. doxygenfunction:: fmt::format_to(OutputIt, string_view, const Args&...)
-.. doxygenfunction:: fmt::format_to_n(OutputIt, size_t, string_view, const Args&...)
+.. doxygenfunction:: fmt::format_to_n(OutputIt, std::size_t, string_view, const Args&...)
 .. doxygenstruct:: fmt::format_to_n_result
    :members:
 
@@ -231,11 +253,10 @@ custom argument formatter class::
 
     using arg_formatter::operator();
 
-    void operator()(int value) {
+    auto operator()(int value) {
       if (spec().type() == 'x')
-        (*this)(static_cast<unsigned>(value)); // convert to unsigned and format
-      else
-        arg_formatter::operator()(value);
+        return (*this)(static_cast<unsigned>(value)); // convert to unsigned and format
+      return arg_formatter::operator()(value);
     }
   };
 
