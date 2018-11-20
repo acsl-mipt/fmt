@@ -1,4 +1,4 @@
-project('fmt', 'cpp', version : '5.0.0', default_options : ['cpp_std=c++11'])
+project('fmt', 'cpp', version : '5.2.1', default_options : ['cpp_std=c++11'])
 
 check_code = '''
 int main(int argc, char** argv)
@@ -52,7 +52,7 @@ fmt_lib = build_target('fmt',
 fmt_dep = declare_dependency(
   link_with : fmt_lib,
   include_directories : include_directories('include', is_system : true),
-  version : '5.0.0',
+  version : '5.2.1',
   compile_args : interface_args,
 )
 
